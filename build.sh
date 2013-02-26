@@ -261,8 +261,8 @@ all() {
     echo "build:"
     [ "$SKIP_DEPENDS" = "true" ] || depends
     [ "$SKIP_UPDATE" = "true" ] || update
-    create_pkgs
-    [ "$SKIP_BUILD" = "true" ] || build_pkgs
+    create
+    [ "$SKIP_BUILD" = "true" ] || build
     [ "$SKIP_UPLOAD" = "true" ] || upload
 }
 ################################################################################
@@ -276,7 +276,7 @@ _main() {
     then 
         local targets='all'
     else
-        local targets="$@"
+        local targets="$*"
     fi
 
     for t in $targets
@@ -308,7 +308,7 @@ _git_update() {
 
 _git_checkout() {
     local dest="$1"
-    local rev="$2"
+    local rev="${2:-"$REV"}"
     local src_dir="${3:-"$SRC_DIR"}"
     local subdir="$4"
     
@@ -328,7 +328,7 @@ _git_checkout() {
 
 _git_changelog() {
     local rev1="$1"
-    local rev2="$2"
+    local rev2="${2:-"$REV"}"
     local src_dir="${3:-"$SRC_DIR"}"
     local path="$4"
     local format="${5:-"  * %B%n"}"
@@ -374,8 +374,8 @@ _orig_tarball() {
 _print_functions() {
     local pattern='^\s*[a-z]\w+\s*\(\s*\)'
     (grep -Eo "$pattern" "$BUILD_SCRIPT_PATH" | tr -d '[ \t\(\)]'; \
-    grep -E '^\s*\.\s+' "$BUILD_SCRIPT_PATH" | awk '{print $2}' | \
-    while read i; do grep -Eo "$pattern" "$i" | tr -d '[ \t\(\)]'; done) | \
+    grep -E '^\s*\.\s+' "$BUILD_SCRIPT_PATH" | awk '{$1=""; print $0}' | \
+    while read i; do grep -Eo "$pattern" "$(eval echo "$i")" | tr -d '[ \t\(\)]'; done) | \
     sort -u
 }
 
