@@ -41,6 +41,10 @@ _checkfuncs() {
 ################################################################################
 
 ########################## Optional variables ##################################
+
+# Package epoch version
+: ${PKG_EPOCH:=''}
+
 # Package maintainer
 : ${MAINTAINER:='Unknown <unknown@unknown>'}
 
@@ -355,9 +359,11 @@ _git_changelog() {
 _gen_changelog() {
     local version="$1"
     local dist="$2"
-    local qualifier="${3:-"-$PPAN~$dist"}"
-    local date="${4:-"$(date -R)"}"
+    local epoch="${3:-"$PKG_EPOCH"}"
+    local qualifier="${4:-"-$PPAN~$dist"}"
+    local date="${5:-"$(date -R)"}"
     
+    [ -z "$epoch" ] || version="$epoch:$version"
     echo "$PKG_NAME (${version}${qualifier}) $dist; urgency=medium"
     echo
     cat
