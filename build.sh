@@ -345,8 +345,14 @@ _git_changelog() {
     then
         rev="$rev2"
     else
-        rev1="$(git --git-dir="$src_dir/.git" log -n1 --format='%H' "$rev1" -- "$path")"
-        rev="$rev1..$rev2"
+        rev1="$(git --git-dir="$src_dir/.git" log -n1 --format='%H' "$rev1" -- "$path" 2>/dev/null || true)"
+
+        if [ -z "$rev1" ]
+        then
+            rev="$rev2"
+        else
+            rev="$rev1..$rev2"
+        fi
     fi
     
     if [ -z "$(git --git-dir="$src_dir/.git" log -n1 --format='%H' "$rev" -- "$path")" ]
