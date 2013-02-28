@@ -1,8 +1,11 @@
 #!/bin/sh
 set -e
 
-DIR="$(cd "$(dirname "$0")" && pwd)"
-BUILD_SCRIPT_PATH="$DIR/$(basename "$0")"
+# Working dir
+: ${DIR:="$(cd "$(dirname "$0")" && pwd)"}
+
+# Path to the currently executing build script
+: ${BUILD_SCRIPT_PATH:="$DIR/$(basename "$0")"}
 
 # Load ~/.build.config script if exists.
 if [ -f "$HOME/.build.config" ]; then . "$HOME/.build.config"; fi
@@ -262,7 +265,6 @@ upload() {
 }
 
 all() {
-    echo "build:"
     [ "$SKIP_DEPENDS" = "true" ] || depends
     [ "$SKIP_UPDATE" = "true" ] || update
     create
@@ -274,7 +276,7 @@ all() {
 ############################## Main function ###################################
 _main() {
     _checkfuncs
-    local TARGETS=$(_print_functions | tr '\n' '|' | head -c -1)
+    local TARGETS=$(_print_functions "$BUILD_SCRIPT_PATH" | tr '\n' '|' | head -c -1)
     
     if [ -z "$1" ]
     then 
@@ -377,11 +379,15 @@ _orig_tarball() {
     tar -C "$(dirname "$src")" $options "$dest" "$(basename "$src")"
 }
 
+_print_functions_in_file() {
+    local file="$1"
+    grep -Eo '^\s*[a-z]\w+\s*\(\s*\)' "$file" | tr -d '[ \t\(\)]'
+}
 _print_functions() {
-    local pattern='^\s*[a-z]\w+\s*\(\s*\)'
-    (grep -Eo "$pattern" "$BUILD_SCRIPT_PATH" | tr -d '[ \t\(\)]'; \
-    grep -E '^\s*\.\s+' "$BUILD_SCRIPT_PATH" | awk '{$1=""; print $0}' | \
-    while read i; do grep -Eo "$pattern" "$(eval echo "$i")" | tr -d '[ \t\(\)]'; done) | \
+    local file="$1"
+    (_print_functions_in_file "$file"; \
+    grep -E '^\s*\.\s+' "$file" | awk '{$1 = ""; print $0}' | \
+    while read i; do _print_functions "$(eval echo "$i")"; done) | \
     sort -u
 }
 
