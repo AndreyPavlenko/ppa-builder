@@ -337,7 +337,7 @@ _git_changelog() {
     local rev2="${2:-"$REV"}"
     local src_dir="${3:-"$SRC_DIR"}"
     local path="$4"
-    local format="${5:-"  * %B%n"}"
+    local format="${5:-"  * [%H]%n%B"}"
     local rev;
     rev2="$(git --git-dir="$src_dir/.git" log -n1 --format='%H' "$rev2" -- "$path")"
     
@@ -355,11 +355,72 @@ _git_changelog() {
         fi
     fi
     
-    if [ -z "$(git --git-dir="$src_dir/.git" log -n1 --format='%H' "$rev" -- "$path")" ]
+    if [ -z "$(git --git-dir="$src_dir/.git" log -n1 --format='%H' "$rev" -- "$path" 2>/dev/null || true)" ]
     then
         echo "  * Revision: $rev2\n"
     else
         git --git-dir="$src_dir/.git" log --format="$format" "$rev" -- "$path" | \
+        sed -r  '/  \* /! s/^(.*)$/    \1/g'
+    fi
+}
+
+_hg_update() {
+    local src_url="$1"
+    local src_dir="${2:-"$SRC_DIR"}"
+    
+    if [ ! -d "$src_dir" ]
+    then
+        hg clone -U "$src_url" "$src_dir"
+    else
+        hg --cwd "$src_dir" pull -u
+    fi
+}
+
+_hg_checkout() {
+    local dest="$1"
+    local rev="${2:-"$REV"}"
+    local src_dir="${3:-"$SRC_DIR"}"
+    local subdir="$4"
+    
+    
+    if [ -z "$subdir" ]
+    then
+        mkdir -p "$dest"
+        cp -r "$src_dir/.hg" "$dest"
+        hg --cwd "$dest" update -C "$rev"
+        "$RM" -rf "$dest/.hg"
+    else
+        local tmp="$BUILD_DIR/tmp.co.dir"
+        mkdir -p "$tmp"
+        cp -r "$src_dir/.hg" "$tmp"
+        hg --cwd "$tmp" update -C "$rev"
+        mv "$tmp/$subdir" "$dest"
+        "$RM" -rf "$tmp"
+    fi
+}
+
+_hg_changelog() {
+    local rev1="$1"
+    local rev2="${2:-"$REV"}"
+    local src_dir="${3:-"$SRC_DIR"}"
+    local path="$4"
+    local template="${5:-"  * [\{node\}]\\n\{desc\}\\n\\n"}"
+    local rev;
+    rev2="$(hg --cwd "$src_dir" log -l 1 --template '{node}' -r "$rev2" "$path")"
+    
+    if [ "$rev1" = "Unknown" ]
+    then
+        rev="..$rev2"
+    else
+        rev1="$(hg --cwd "$src_dir" log -l 1 --template '{node}' -r "$rev1" "$path" 2>/dev/null || true)"
+        rev="$rev1..$rev2"
+    fi
+    
+    if [ -z "$(hg --cwd "$src_dir" log -l 1 --template '{node}' -r "$rev" "$path" 2>/dev/null || true)" ]
+    then
+        echo "  * Revision: $rev2\n"
+    else
+        hg --cwd "$src_dir" log --template "$template" -r "$rev" "$path" | \
         sed -r  '/  \* /! s/^(.*)$/    \1/g'
     fi
 }
