@@ -425,6 +425,63 @@ _hg_changelog() {
     fi
 }
 
+_svn_update() {
+    local src_url="$1"
+    local src_dir="${2:-"$SRC_DIR"}"
+    local rev="${3:-"$REV"}"
+    [ -z "$rev" ] || rev="-r $rev"
+    
+    if [ ! -d "$src_dir" ]
+    then
+        svn checkout $rev "$src_url" "$src_dir"
+    else
+        svn update $rev "$src_dir"
+    fi
+}
+
+_svn_checkout() {
+    local dest="$1"
+    local src_dir="${2:-"$SRC_DIR"}"
+    local subdir="$3"
+    
+    if [ -z "$subdir" ]
+    then
+        mkdir -p "$dest"
+        cp -r "$src_dir/.svn" "$dest"
+        svn revert -R "$dest"
+        "$RM" -rf "$dest/.svn"
+    else
+        local tmp="$BUILD_DIR/tmp.co.dir"
+        mkdir -p "$tmp"
+        cp -r "$src_dir/.svn" "$tmp"
+        svn revert -R "$tmp"
+        mv "$tmp/$subdir" "$dest"
+        "$RM" -rf "$tmp"
+    fi
+}
+
+_svn_changelog() {
+    local rev1="$1"
+    local rev2="${2:-"$REV"}"
+    local src_dir="${3:-"$SRC_DIR"}"
+    local path="$4"
+    local format="${5:-"s/^-+\$/\\n/; s/^(r[0-9]+) \\| .+\$/  * [\\1]/"}"
+    [ -z "$path" ] || src_dir="$src_dir/$path"
+    
+    if ! echo "$rev1" | grep -Exq  'r?[0-9]+'
+    then
+        rev1="0"
+    fi
+    
+    if ! echo "$rev2" | grep -Exq  'r?[0-9]+'
+    then
+        rev2="$(svn info --xml "$src_dir" | tr '\n' ' ' | grep -oE '<commit\s+revision\s*=\s*"[0-9]+"\s*>' | grep -oE '[0-9]+')"
+    fi
+    
+    svn log -r "$rev1:$rev2" "$src_dir" | sed -r "$format" | \
+    sed -r  '/  \* /! s/^(.*)$/    \1/g'
+}
+
 _gen_changelog() {
     local version="$1"
     local dist="$2"
