@@ -8,10 +8,10 @@ set -e
 : ${BUILD_SCRIPT_PATH:="$DIR/$(basename "$0")"}
 
 # Load ~/.build.config script if exists.
-if [ -f "$HOME/.build.config" ]; then . "$HOME/.build.config"; fi
+[ ! -f "$HOME/.build.config" ] || [ ! -z "$IGNORE_GLOBAL_CONFIG" ] || . "$HOME/.build.config"
 
 # Load build.config script if exists.
-if [ -f "$DIR/build.config" ]; then . "$DIR/build.config"; fi
+[ ! -f "$DIR/build.config" ] || [ ! -z "$IGNORE_CONFIG" ] || . "$DIR/build.config"
 
 ################### Mandatory variables to be defined ##########################
 _checkvar () { if eval "[ -z \"\$$1\" ]"; then echo "Variable $1 is not set"; exit 1; fi }
@@ -228,10 +228,8 @@ cur_version() {
 }
 
 check_updates() {
-    echo "check_updates:"
     local version="$(version)"
     local names=''
-    echo -n "Checking updates for $PKG_NAME...\t"
 
     for dist in $(for i in $TARGET_PLATFORMS; do echo $i | awk -F ':' '{print $1}'; done | sort -u)
     do
@@ -245,11 +243,9 @@ check_updates() {
     
     if [ -z "$names" ]
     then
-        echo "up to date."
-        return 0
+        echo "Up to date."
     else
-        echo "updates are available for:$names"
-        return 1
+        echo "Updates are available for:$names"
     fi
 }
 
