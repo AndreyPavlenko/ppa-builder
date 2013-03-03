@@ -333,7 +333,7 @@ _git_changelog() {
     local rev2="${2:-"$REV"}"
     local src_dir="${3:-"$SRC_DIR"}"
     local path="$4"
-    local format="${5:-"  * [%H]%n%B"}"
+    local format="${5:-"  * [%H]%n%B%n"}"
     local rev;
     rev2="$(git --git-dir="$src_dir/.git" log -n1 --format='%H' "$rev2" -- "$path")"
     
@@ -356,7 +356,7 @@ _git_changelog() {
         echo "  * Revision: $rev2\n"
     else
         git --git-dir="$src_dir/.git" log --format="$format" "$rev" -- "$path" | \
-        sed -r  '/  \* /! s/^(.*)$/    \1/g'
+        head -c -1 | sed -r  '/  \* /! s/^(.*)$/    \1/g'
     fi
 }
 
@@ -489,6 +489,7 @@ _gen_changelog() {
     echo "$PKG_NAME (${version}${qualifier}) $dist; urgency=medium"
     echo
     cat
+    echo
     echo " -- $MAINTAINER  $date"
 }
 
