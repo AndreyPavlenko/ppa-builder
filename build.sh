@@ -539,16 +539,15 @@ _pbuild_create() {
     local arch=$2
     local btgz="$BASETGZ_DIR/${distrib}_${arch}.tgz"
     local pbuilderrc="$BUILD_DIR/$distrib.pbuilderrc"
+    
+    [ -d "$BUILD_DIR" ] || mkdir -p "$BUILD_DIR"
+    [ -d "$BASETGZ_DIR" ] || mkdir -p "$BASETGZ_DIR"
+    [ -d "$APT_CACHE_DIR" ] || mkdir -p "$APT_CACHE_DIR"
+    [ -d "$DISTRIBS_DEB_DIR" ] || mkdir -p "$DISTRIBS_DEB_DIR"
 
     if [ ! -f "$btgz" ]
     then
         echo "Creating base tarball: $btgz"
-        [ -d "$BUILD_DIR" ] || mkdir -p "$BUILD_DIR"
-        [ -d "$BASETGZ_DIR" ] || mkdir -p "$BASETGZ_DIR"
-        [ -d "$APT_CACHE_DIR" ] || mkdir -p "$APT_CACHE_DIR"
-        [ -d "$DISTRIBS_DEB_DIR" ] || mkdir -p "$DISTRIBS_DEB_DIR"
-
-
         _gen_pbuilderrc "$distrib" "$pbuilderrc"
         $SUDO pbuilder create --configfile "$pbuilderrc" --debootstrapopts --variant=buildd --basetgz "$btgz"\
               --distribution ${distrib} --architecture ${arch} \
@@ -556,9 +555,6 @@ _pbuild_create() {
     elif [ "$SKIP_UPDATE_BASE" != "true" ]
     then
         echo "Updating base tarball: $btgz"
-        [ -d "$BUILD_DIR" ] || mkdir -p "$BUILD_DIR"
-        [ -d "$APT_CACHE_DIR" ] || mkdir -p "$APT_CACHE_DIR"
-
         _gen_pbuilderrc "$distrib" "$pbuilderrc"
         $SUDO pbuilder update --configfile "$pbuilderrc" --basetgz "$btgz" $PBUILDER_ARGS
     fi
