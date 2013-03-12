@@ -346,11 +346,14 @@ _git_changelog() {
         if [ -z "$rev1" ]
         then
             rev="$rev2"
+        elif [ "$rev1" = "$rev2" ]
+        then 
+            rev="$rev2~1..$rev2"
         else
             rev="$rev1..$rev2"
         fi
     fi
-    
+
     if [ -z "$(git --git-dir="$src_dir/.git" log -n1 --format='%H' "$rev" -- "$path" 2>/dev/null || true)" ]
     then
         echo "  * Revision: $rev2\n"
