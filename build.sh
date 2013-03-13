@@ -137,8 +137,8 @@ create() {
     # Create source packages
     for dist in $(for i in $TARGET_PLATFORMS; do echo $i | awk -F ':' '{print $1}'; done | sort -u)
     do
-        local deb_dir="$(_deb_dir "$dist")"
-        [ -d "$deb_dir" ] || (echo "Debian directory does not exists: $deb_dir" 1>&2 && exit 1)
+        local deb_dir="$(_deb_dir "$src" "$dist")"
+        [ -d "$deb_dir" ] || (echo "Debian directory does not exist: $deb_dir" 1>&2 && exit 1)
         
         $RM -rf "$src/debian"
         cp -r "$deb_dir" "$src"
@@ -588,7 +588,8 @@ _cur_version() {
     ([ -z "$version" ] && echo "Unknown") || echo "${version%-*}"
 }
 
-# Print (and possibly generate) path to the deb directory for the specified distrib.
+# Print (and possibly generate) path to the deb directory for the specified 
+# checkout directory and distrib.
 _deb_dir() {
     echo "$DEB_DIR"
 }
