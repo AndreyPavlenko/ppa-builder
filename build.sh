@@ -121,6 +121,7 @@ DEPENDS="pbuilder debootstrap lsb-release dpkg-dev debhelper $DEPENDS"
 ################################## Targets #####################################
 
 create() {
+    echo "create:"
     local version=$(version)
     local name_ver="${PKG_NAME}_${version}"
     local src="$BUILD_DIR/$name_ver"
@@ -299,12 +300,14 @@ _main() {
 _git_update() {
     local src_url="$1"
     local src_dir="${2:-"$SRC_DIR"}"
-    
+    local branch="${3:-"${REV#*/}"}"
+    local remote="${4:-"${REV%/*}"}"
+
     if [ ! -d "$src_dir" ]
     then
-        git clone --no-checkout "$src_url" "$src_dir"
+        git clone --no-checkout -b "$branch" "$src_url" "$src_dir"
     else
-        git --git-dir="$src_dir/.git" fetch
+        git --git-dir="$src_dir/.git" fetch $remote $branch:refs/remotes/origin/$branch -f
     fi
 }
 
