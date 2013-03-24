@@ -231,12 +231,13 @@ cur_version() {
 check_updates() {
     local version="$(version)"
     local names=''
-
     for dist in $(for i in $TARGET_PLATFORMS; do echo $i | awk -F ':' '{print $1}'; done | sort -u)
     do
         local cur_version="$(_cur_version "$dist")"
+        local epoch=''
+        echo "$cur_version" | grep -q ':' && epoch="${cur_version%%:*}"
         
-        if [ "$version" != "$cur_version" ]
+        if [ "$version" != "${cur_version#*:}" ] || [ "$PKG_EPOCH" != "$epoch" ]
         then
             names="$names $dist"
         fi
