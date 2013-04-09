@@ -126,6 +126,8 @@ create() {
     local name_ver="${PKG_NAME}_${version}"
     local src="$BUILD_DIR/$name_ver"
     local orig_tar="$BUILD_DIR/$name_ver.orig.tar.bz2"
+    local bp_args="$BUILDPACKAGE_ARGS"
+    echo "$BUILDPACKAGE_ARGS" | grep -qE '\-sa|\-sd|\-si' || sa="-sa"
     
     # Checkout
     "$RM" -rf "$BUILD_DIR"
@@ -147,7 +149,8 @@ create() {
         sed -i "s/#MAINTAINER#/$MAINTAINER/" "$src/debian/control"
 
         cd "$src"
-        dpkg-buildpackage -rfakeroot $BUILDPACKAGE_ARGS -S -sa
+        dpkg-buildpackage -rfakeroot $BUILDPACKAGE_ARGS $sa -S
+        [ -z "$sa" ] || sa='-sd'
     done
 
     # Move package to $DISTRIBS_SRC_DIR
