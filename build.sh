@@ -106,6 +106,9 @@ DEPENDS="pbuilder debootstrap lsb-release dpkg-dev debhelper $DEPENDS"
 # Target platforms
 : ${TARGET_PLATFORMS:="$(lsb_release -cs):$(dpkg-architecture -qDEB_BUILD_ARCH)"}
 
+# Maximum number of changelog records.
+: ${MAX_CHANGELOGS:='1000'}
+
 # Command aliases
 : ${SUDO:='sudo'}
 : ${RM:='/bin/rm'}
@@ -341,6 +344,7 @@ _git_changelog() {
     local src_dir="${3:-"$SRC_DIR"}"
     local path="$4"
     local format="${5:-"  * [%H]%n%B%n"}"
+    local max="${6:-"$MAX_CHANGELOGS"}"
     local rev;
     rev2="$(git --git-dir="$src_dir/.git" log -n1 --format='%H' "$rev2" -- "$path")"
     
@@ -365,7 +369,7 @@ _git_changelog() {
     then
         echo "  * Revision: $rev2\n"
     else
-        git --git-dir="$src_dir/.git" log --format="$format" "$rev" -- "$path" | \
+        git --git-dir="$src_dir/.git" log -n $max --format="$format" "$rev" -- "$path" | \
         head -c -1 | sed -r  '/  \* /! s/^(.*)$/    \1/g'
     fi
 }
@@ -411,6 +415,7 @@ _hg_changelog() {
     local src_dir="${3:-"$SRC_DIR"}"
     local path="$4"
     local template="${5:-"  * [\{node\}]\\n\{desc\}\\n\\n"}"
+    local max="${6:-"$MAX_CHANGELOGS"}"
     local rev;
     rev2="$(hg --cwd "$src_dir" log -l 1 --template '{node}' -r "$rev2" "$path")"
     
@@ -426,7 +431,7 @@ _hg_changelog() {
     then
         echo "  * Revision: $rev2\n"
     else
-        hg --cwd "$src_dir" log --template "$template" -r "$rev" "$path" | \
+        hg -l $max --cwd "$src_dir" log --template "$template" -r "$rev" "$path" | \
         sed -r  '/  \* /! s/^(.*)$/    \1/g'
     fi
 }
@@ -472,6 +477,7 @@ _svn_changelog() {
     local src_dir="${3:-"$SRC_DIR"}"
     local path="$4"
     local format="${5:-"s/^-+\$/\\n/; s/^(r[0-9]+) \\| .+\$/  * [\\1]/"}"
+    local max="${6:-"$MAX_CHANGELOGS"}"
     [ -z "$path" ] || src_dir="$src_dir/$path"
     
     if ! echo "$rev1" | grep -Exq  'r?[0-9]+'
@@ -484,7 +490,7 @@ _svn_changelog() {
         rev2="$(svn info --xml "$src_dir" | tr '\n' ' ' | grep -oE '<commit\s+revision\s*=\s*"[0-9]+"\s*>' | grep -oE '[0-9]+')"
     fi
     
-    svn log -r "$rev1:$rev2" "$src_dir" | sed -r "$format" | \
+    svn log -l $max -r "$rev1:$rev2" "$src_dir" | sed -r "$format" | \
     sed -r  '/  \* /! s/^(.*)$/    \1/g'
 }
 
