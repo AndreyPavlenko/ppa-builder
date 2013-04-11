@@ -128,17 +128,43 @@ create() {
     local version=$(version)
     local name_ver="${PKG_NAME}_${version}"
     local src="$BUILD_DIR/$name_ver"
-    local orig_tar="$BUILD_DIR/$name_ver.orig.tar.bz2"
+    local orig_tar_name="$name_ver.orig.tar.bz2"
+    local orig_tar="$BUILD_DIR/$orig_tar_name"
     local bp_args="$BUILDPACKAGE_ARGS"
     echo "$BUILDPACKAGE_ARGS" | grep -qE '\-sa|\-sd|\-si' || sa="-sa"
     
-    # Checkout
     "$RM" -rf "$BUILD_DIR"
     mkdir -p "$BUILD_DIR"
-    _checkout "$src"
+    
     
     # Create orig source tarball
-    _orig_tarball "$src" "$orig_tar"
+    if [ -z "$DOWNLOAD_ORIG" ]
+    then
+    	_checkout "$src"
+        _orig_tarball "$src" "$orig_tar"
+    else
+    	local ppa_distribs="$(curl "$PPA_URL/$PPA/ubuntu/dists/" 2>/dev/null | awk -F '">|/<' '/\/icons\/folder.gif/ {print $4}')"
+    	local dir=''
+    	
+    	for i in $ppa_distribs
+    	do
+    		dir="$(curl $PPA_URL/$PPA/ubuntu/dists/$i/main/source/Sources.gz 2>/dev/null | gunzip | grep -m 1 "$orig_tar_name" -B2 | awk '/Directory: / {print $2}')"
+    		[ -z "$dir" ] || break
+    	done
+    	
+    	if [ -z "$dir" ]
+    	then
+    		echo "Failed to find $orig_tar_name at $PPA_URL/$PPA" 1>&2
+    		exit 1
+    	else
+    		local url="$PPA_URL/$PPA/ubuntu/$dir/$orig_tar_name"
+    		echo "Downloading $url to $orig_tar"
+    	    curl "$url" > "$orig_tar"
+    	    tar -C "$BUILD_DIR" -xjf "$orig_tar"
+    	    sa='-sd'
+    	fi
+    fi
+    
     
     # Create source packages
     for dist in $(for i in $TARGET_PLATFORMS; do echo $i | awk -F ':' '{print $1}'; done | sort -u)
