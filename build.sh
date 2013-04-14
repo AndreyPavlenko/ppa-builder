@@ -334,7 +334,7 @@ _git_update() {
     local src_url="$1"
     local src_dir="${2:-"$SRC_DIR"}"
     local branch="${3:-"${REV#*/}"}"
-    local remote="${4:-"${REV%/*}"}"
+    local remote="${4:-"${REV%%/*}"}"
 
     if [ ! -d "$src_dir" ]
     then
