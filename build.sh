@@ -89,7 +89,7 @@ BUILD_DATE=$(date +%d.%m.%y)
 : ${BUILDPACKAGE_ARGS:="-uc -us"}
 
 # Build script dependencies
-DEPENDS="pbuilder debootstrap lsb-release dpkg-dev debhelper $DEPENDS"
+DEPENDS="pbuilder debootstrap lsb-release dpkg dpkg-dev debhelper $DEPENDS"
 
 # Aptitude tag to mark all installed dependencies
 : ${DEPENDS_TAG:="$PKG_NAME-build"}
@@ -263,13 +263,13 @@ cur_version() {
 check_updates() {
     local version="$(version)"
     local names=''
+    [ -z "$PKG_EPOCH" ] || version="$PKG_EPOCH:$version"
+    
     for dist in $(for i in $TARGET_PLATFORMS; do echo $i | awk -F ':' '{print $1}'; done | sort -u)
     do
         local cur_version="$(_cur_version "$dist")"
-        local epoch=''
-        echo "$cur_version" | grep -q ':' && epoch="${cur_version%%:*}"
         
-        if [ "$version" != "${cur_version#*:}" ] || [ "$PKG_EPOCH" != "$epoch" ]
+        if dpkg --compare-versions "$version" gt "$cur_version"
         then
             names="$names $dist"
         fi
