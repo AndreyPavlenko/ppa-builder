@@ -95,7 +95,9 @@ DEPENDS="pbuilder debootstrap lsb-release dpkg dpkg-dev debhelper $DEPENDS"
 : ${DEPENDS_TAG:="$PKG_NAME-build"}
 
 # URL of a ppa containing build dependencies
-: ${PPA_DEPENDS:="deb $PPA_URL/$PPA/ubuntu #DISTRIB# main"}
+: ${PPA_DEPENDS:="\
+deb $PPA_URL/$PPA/ubuntu #DISTRIB# main
+deb-src $PPA_URL/$PPA/ubuntu #DISTRIB# main"}
 
 # URL of ppa sources
 : ${PPA_SOURCES:="$PPA_URL/$PPA/ubuntu/dists/#DISTRIB#/main/source/Sources.gz"}
@@ -124,7 +126,6 @@ DEPENDS="pbuilder debootstrap lsb-release dpkg dpkg-dev debhelper $DEPENDS"
 ################################## Targets #####################################
 
 create() {
-    echo "create:"
     local version=$(version)
     local name_ver="${PKG_NAME}_${version}"
     local src="$BUILD_DIR/$name_ver"
@@ -136,33 +137,32 @@ create() {
     "$RM" -rf "$BUILD_DIR"
     mkdir -p "$BUILD_DIR"
     
-    
     # Create orig source tarball
     if [ -z "$DOWNLOAD_ORIG" ]
     then
-    	_checkout "$src"
+        _checkout "$src"
         _orig_tarball "$src" "$orig_tar"
     else
-    	local ppa_distribs="$(curl "$PPA_URL/$PPA/ubuntu/dists/" 2>/dev/null | awk -F '">|/<' '/\/icons\/folder.gif/ {print $4}')"
-    	local dir=''
-    	
-    	for i in $ppa_distribs
-    	do
-    		dir="$(curl $PPA_URL/$PPA/ubuntu/dists/$i/main/source/Sources.gz 2>/dev/null | gunzip | grep -m 1 "$orig_tar_name" -B2 | awk '/Directory: / {print $2}')"
-    		[ -z "$dir" ] || break
-    	done
-    	
-    	if [ -z "$dir" ]
-    	then
-    		echo "Failed to find $orig_tar_name at $PPA_URL/$PPA" 1>&2
-    		exit 1
-    	else
-    		local url="$PPA_URL/$PPA/ubuntu/$dir/$orig_tar_name"
-    		echo "Downloading $url to $orig_tar"
-    	    curl "$url" > "$orig_tar"
-    	    tar -C "$BUILD_DIR" -xjf "$orig_tar"
-    	    sa='-sd'
-    	fi
+        local ppa_distribs="$(curl "$PPA_URL/$PPA/ubuntu/dists/" 2>/dev/null | awk -F '">|/<' '/\/icons\/folder.gif/ {print $4}')"
+        local dir=''
+        
+        for i in $ppa_distribs
+        do
+            dir="$(curl $PPA_URL/$PPA/ubuntu/dists/$i/main/source/Sources.gz 2>/dev/null | gunzip | grep -m 1 "$orig_tar_name" -B2 | awk '/Directory: / {print $2}')"
+            [ -z "$dir" ] || break
+        done
+        
+        if [ -z "$dir" ]
+        then
+            echo "Failed to find $orig_tar_name at $PPA_URL/$PPA" 1>&2
+            exit 1
+        else
+            local url="$PPA_URL/$PPA/ubuntu/$dir/$orig_tar_name"
+            echo "Downloading $url to $orig_tar"
+            curl "$url" > "$orig_tar"
+            tar -C "$BUILD_DIR" -xjf "$orig_tar"
+            sa='-sd'
+        fi
     fi
     
     
@@ -191,7 +191,6 @@ create() {
 }
 
 build() {
-    echo "build:"
     cd "$DISTRIBS_SRC_DIR"
     : ${PACKAGES:=$(ls *.dsc)}
     $RM -rf "$BUILD_DIR"
@@ -201,13 +200,48 @@ build() {
         local distrib=$(echo $i | awk -F ':' '{print $1}')
         local arch=$(echo $i | awk -F ':' '{print $2}')
 
-        _pbuild_create $distrib $arch
-        _pbuild_build  $distrib $arch
+        _pbuilder_create $distrib $arch
+        _pbuilder_build  $distrib $arch
     done
 
     cd "$DISTRIBS_DEB_DIR"
     $RM -f *.tar.bz2 *.dsc *.changes
     $RM -rf "$BUILD_DIR"
+}
+
+chroot() {
+    local platform=''
+    local bind=''
+    [ -d "$DISTRIBS_SRC_DIR" ] && bind="$DISTRIBS_SRC_DIR"
+    
+    while [ ! -z "$1" ]
+    do
+        case "$1" in
+        --platform=*) platform="${1#--platform=}"; shift 1;;
+            --bind=*) bind="$bind ${1#--bind=}"; shift 1;;
+                   *) 
+                      [ ! -z "$1" ] && echo "Invalid option $1"
+                      echo "Usage: chroot [--platform=name:arch] [--bind=\"dir1 dir2...\"]"
+                      return 1 ;;
+        esac
+    done
+
+    if [ -z "$platform" ] 
+    then 
+        local distrib="$(lsb_release -cs)"
+        local arch="$(dpkg-architecture -qDEB_BUILD_ARCH)"
+    else
+        local distrib="${platform%:*}"
+        local arch="${platform#*:}"
+        [ -z "$distrib" ] && echo "Invalid distrib name: $distrib" && exit 1
+        [ -z "$arch" ]    && echo "Invalid arch: $arch" && exit 1
+    fi
+    
+    cd "$DIR"
+    $RM -rf  "$BUILD_DIR"
+    mkdir -p "$BUILD_DIR"
+    _pbuilder_create $distrib $arch
+    _pbuilder_login $distrib $arch $bind
 }
 
 depends() {
@@ -226,27 +260,22 @@ EOF
 }
 
 clean() {
-    echo "clean:"
     $RM -rf "$DISTRIBS_DIR"
 }
 
 clean_cache() {
-    echo "clean_cache:"
     $RM -rf "$CACHE_DIR"
 }
 
 clean_depends() {
-    echo "clean_depends:"
     $SUDO aptitude purge "?user-tag($DEPENDS_TAG)"
 }
 
 clean_sources() {
-    echo "clean_sources:"
     $RM -rf "$SRC_DIR"
 }
 
 clean_all() {
-    echo "clean_all:"
     clean
     clean_cache
     clean_depends
@@ -284,8 +313,6 @@ check_updates() {
 }
 
 upload() {
-    echo "upload:"
-    
     cd "$DISTRIBS_SRC_DIR"
     : ${PACKAGES:=$(ls *.dsc)}
     local changes="$(for i in $PACKAGES; do echo $i | sed 's/.dsc$/_source.changes/'; done)"
@@ -306,25 +333,49 @@ all() {
 ############################## Main function ###################################
 _main() {
     _checkfuncs
-    local TARGETS=$(_print_functions "$BUILD_SCRIPT_PATH" | tr '\n' '|' | head -c -1)
+    local pid="$$"
     
     if [ -z "$1" ]
-    then 
-        local targets='all'
-    else
-        local targets="$*"
+    then
+        echo "all:"
+        all
+        return $?
     fi
 
-    for t in $targets
+    local TARGETS=$(_print_functions "$BUILD_SCRIPT_PATH" | tr '\n' '|' | head -c -1)
+    
+    while [ ! -z "$1" ]
     do
+        local t="$1"
+        shift 1
+        
         if echo "$t" | grep -Eq "^($TARGETS)\$"
         then
-            $t
+            local args=''
+            
+            while [ ! -z "$1" ]
+            do
+                case $1 in
+                    -*) [ -z "$args" ] && args="$1" || args="$args $1"; shift 1 ;;
+                     *) break ;;
+                esac
+            done
+            
+            if [ -z "$args" ]
+            then
+                echo "$t:"
+                $t
+            else
+                echo "$t $args:"
+                $t $args
+            fi
         else
             echo "Unknown target $t"
             echo "Usage: $(basename "$BUILD_SCRIPT_PATH") <$TARGETS>"
         fi
     done
+    
+    $RM -rf "$BUILD_DIR"
 }
 ################################################################################
 
@@ -546,6 +597,7 @@ _print_functions_in_file() {
     local file="$1"
     grep -Eo '^\s*[a-z]\w+\s*\(\s*\)' "$file" | tr -d '[ \t\(\)]'
 }
+
 _print_functions() {
     local file="$1"
     (_print_functions_in_file "$file"; \
@@ -568,15 +620,16 @@ cat << EOF > "$pbuilderrc"
 ALLOWUNTRUSTED=yes
 APTCACHEHARDLINK=no
 BUILDRESULTUID=$SUDO_UID
-OTHERMIRROR="deb $DEB_MIRROR $distrib main restricted universe multiverse|\
-             deb $DEB_MIRROR $distrib-security main restricted universe multiverse|\
-             deb $DEB_MIRROR $distrib-updates main restricted universe multiverse|\
-             $ppa_depends"
+OTHERMIRROR="\
+deb $DEB_MIRROR $distrib main restricted universe multiverse|\
+deb $DEB_MIRROR $distrib-security main restricted universe multiverse|\
+deb $DEB_MIRROR $distrib-updates main restricted universe multiverse|\
+$ppa_depends"
 EOF
     fi
 }
 
-_pbuild_create() {
+_pbuilder_create() {
     local distrib=$1
     local arch=$2
     local btgz="$BASETGZ_DIR/${distrib}_${arch}.tgz"
@@ -591,20 +644,27 @@ _pbuild_create() {
     then
         echo "Creating base tarball: $btgz"
         _gen_pbuilderrc "$distrib" "$pbuilderrc"
-        $SUDO pbuilder create --configfile "$pbuilderrc" --debootstrapopts --variant=buildd --basetgz "$btgz"\
-              --distribution ${distrib} --architecture ${arch} \
-              $PBUILDER_ARGS || ($RM -f "$btgz" && return 1)
+             $SUDO pbuilder create --configfile "$pbuilderrc" --debootstrapopts --variant=buildd --basetgz "$btgz"\
+                   --distribution ${distrib} --architecture ${arch} \
+                   $PBUILDER_ARGS || ($RM -f "$btgz" && return 1)
+        echo $SUDO pbuilder create --configfile "$pbuilderrc" --debootstrapopts --variant=buildd --basetgz "$btgz"\
+                   --distribution ${distrib} --architecture ${arch} \
+                   $PBUILDER_ARGS || ($RM -f "$btgz" && return 1)
     elif [ "$SKIP_UPDATE_BASE" != "true" ]
     then
         echo "Updating base tarball: $btgz"
         _gen_pbuilderrc "$distrib" "$pbuilderrc"
-        $SUDO pbuilder update --configfile "$pbuilderrc" --basetgz "$btgz" $PBUILDER_ARGS
+        echo $SUDO pbuilder update --configfile "$pbuilderrc" --basetgz "$btgz" \
+                   --distribution ${distrib} --architecture ${arch} $PBUILDER_ARGS
+             $SUDO pbuilder update --configfile "$pbuilderrc" --basetgz "$btgz" \
+                   --distribution ${distrib} --architecture ${arch} $PBUILDER_ARGS
     fi
 }
 
-_pbuild_build() {
+_pbuilder_build() {
     local distrib=$1
     local arch=$2
+    
     local btgz="$BASETGZ_DIR/${distrib}_${arch}.tgz"
     local pkgs=$(for i in $PACKAGES; do case $i in *~$distrib.dsc) echo $i;; esac; done)
     local pbuilderrc="$BUILD_DIR/$distrib.pbuilderrc"
@@ -615,7 +675,32 @@ _pbuild_build() {
     [ -d "$APT_CACHE_DIR" ] || mkdir -p "$APT_CACHE_DIR"
 
     _gen_pbuilderrc "$distrib" "$pbuilderrc"
-    $SUDO pbuilder build --configfile "$pbuilderrc" --basetgz "$btgz" $PBUILDER_ARGS $pkgs
+    echo $SUDO pbuilder build --configfile "$pbuilderrc" --basetgz "$btgz" \
+               --distribution ${distrib} --architecture ${arch} $PBUILDER_ARGS $pkgs
+         $SUDO pbuilder build --configfile "$pbuilderrc" --basetgz "$btgz" \
+               --distribution ${distrib} --architecture ${arch} $PBUILDER_ARGS $pkgs
+}
+
+_pbuilder_login() {
+	local distrib=$1
+    local arch=$2
+    local bind=''
+    local btgz="$BASETGZ_DIR/${distrib}_${arch}.tgz"
+    local pbuilderrc="$BUILD_DIR/$distrib.pbuilderrc"
+    shift 2
+    [ -z "$*" ] || bind="$*"
+
+    [ -d "$BUILD_DIR" ] || mkdir -p "$BUILD_DIR"
+    [ -d "$DISTRIBS_DEB_DIR" ] || mkdir -p "$DISTRIBS_DEB_DIR"
+    [ -d "$APT_CACHE_DIR" ] || mkdir -p "$APT_CACHE_DIR"
+
+    _gen_pbuilderrc "$distrib" "$pbuilderrc"
+    echo $SUDO pbuilder login --configfile "$pbuilderrc" --basetgz "$btgz" \
+               --distribution ${distrib} --architecture ${arch} \
+               $PBUILDER_ARGS --bindmounts "$bind"
+         $SUDO pbuilder login --configfile "$pbuilderrc" --basetgz "$btgz" \
+               --distribution ${distrib} --architecture ${arch} \
+               $PBUILDER_ARGS --bindmounts "$bind"
 }
 
 _cur_version() {
