@@ -298,7 +298,7 @@ check_updates() {
     do
         local cur_version="$(_cur_version "$dist")"
         
-        if dpkg --compare-versions "$version" gt "$cur_version"
+        if [ "$cur_version" = "Unknown" ] || dpkg --compare-versions "$version" gt "$cur_version"
         then
             names="$names $dist"
         fi
