@@ -571,6 +571,11 @@ _svn_changelog() {
     sed -r  '/  \* /! s/^(.*)$/    \1/g'
 }
 
+_svn_rev() {
+    local src_dir="${1:-"$SRC_DIR"}"
+    svn info --xml "$SRC_DIR" | tr '\n' ' ' | grep -oE '<commit\s+revision\s*=\s*"[0-9]+"\s*>' | grep -oE '[0-9]+'
+}
+
 _gen_changelog() {
     local version="$1"
     local dist="$2"
