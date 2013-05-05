@@ -244,6 +244,18 @@ chroot() {
     _pbuilder_login $distrib $arch $bind
 }
 
+changelog() {
+    case "$1" in
+    --dist=*) local dist="${1#--dist=}" ;;
+          '') local dist="$(lsb_release -cs)" ;;
+           *) echo "Invalid option $1"
+              echo "Usage: changelog [--dist=<distrib name>]"
+              return 1 ;;
+    esac
+
+    _changelog "$dist"
+}
+
 depends() {
 cat << EOF
 depends:
