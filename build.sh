@@ -116,9 +116,10 @@ deb-src $PPA_URL/$PPA/ubuntu #DISTRIB# main"}
 : ${RM:='/bin/rm'}
 
 # Skip targets
-: ${SKIP_DEPENDS:='false'}
-: ${SKIP_UPDATE:='false'}
-: ${SKIP_UPDATE_BASE:='false'}
+: ${SKIP:='false'} # A shorthand to skip all updates and depends
+: ${SKIP_DEPENDS:="$SKIP"}
+: ${SKIP_UPDATE:="$SKIP"}
+: ${SKIP_UPDATE_BASE:="$SKIP"}
 : ${SKIP_BUILD:='false'}
 : ${SKIP_UPLOAD:='true'}
 ################################################################################
