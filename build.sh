@@ -404,7 +404,8 @@ _git_update() {
     then
         git clone --no-checkout -b "$branch" "$src_url" "$src_dir"
     else
-        git --git-dir="$src_dir/.git" fetch $remote $branch:refs/remotes/origin/$branch -f
+    	git --git-dir="$src_dir/.git" remote add "$remote" "$src_url" 2> /dev/null || true
+        git --git-dir="$src_dir/.git" fetch "$remote" "$branch:refs/remotes/$remote/$branch" -f
     fi
 }
 
