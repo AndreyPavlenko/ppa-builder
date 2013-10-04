@@ -133,7 +133,7 @@ create() {
     local orig_tar_name="$name_ver.orig.tar.bz2"
     local orig_tar="$BUILD_DIR/$orig_tar_name"
     local bp_args="$BUILDPACKAGE_ARGS"
-    echo "$BUILDPACKAGE_ARGS" | grep -qE '\-sa|\-sd|\-si' || sa="-sa"
+    echo "$BUILDPACKAGE_ARGS" | grep -qE '\-sa|\-sd|\-si' || local sa="-sa"
     
     "$RM" -rf "$BUILD_DIR"
     mkdir -p "$BUILD_DIR"
@@ -155,8 +155,9 @@ create() {
         
         if [ -z "$dir" ]
         then
-            echo "Failed to find $orig_tar_name at $PPA_URL/$PPA" 1>&2
-            exit 1
+            echo "Orig tarball $orig_tar_name not found at $PPA_URL/$PPA - building from sources"
+            _checkout "$src"
+            _orig_tarball "$src" "$orig_tar"
         else
             local url="$PPA_URL/$PPA/ubuntu/$dir/$orig_tar_name"
             echo "Downloading $url to $orig_tar"
