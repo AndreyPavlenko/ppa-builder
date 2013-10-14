@@ -582,7 +582,7 @@ _svn_changelog() {
         rev2="$(svn info --xml "$src_dir" | tr '\n' ' ' | grep -oE '<commit\s+revision\s*=\s*"[0-9]+"\s*>' | grep -oE '[0-9]+')"
     fi
     
-    svn log -l $max -r "$rev1:$rev2" "$src_dir" | sed -r "$format" | \
+    svn log -l $max -r "$rev2:$rev1" "$src_dir" | sed -r "$format" | \
     sed -r  '/  \* /! s/^(.*)$/    \1/g'
 }
 
