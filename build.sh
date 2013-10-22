@@ -523,7 +523,7 @@ _hg_changelog() {
     then
         echo "  * Revision: $rev2\n"
     else
-        hg -l $max --cwd "$src_dir" log --template "$template" -r "$rev" "$path" | \
+        hg --cwd "$src_dir" log -l $max --template "$template" -r "$rev" "$path" | \
         sed -r  '/  \* /! s/^(.*)$/    \1/g'
     fi
 }
