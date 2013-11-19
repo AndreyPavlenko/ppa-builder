@@ -127,6 +127,9 @@ deb-src $PPA_URL/$PPA/ubuntu #DISTRIB# main"}
 ################################## Targets #####################################
 
 create() {
+    $RM -rf "$BUILD_DIR"
+    mkdir -p "$BUILD_DIR"
+    
     local version=$(version)
     local name_ver="${PKG_NAME}_${version}"
     local src="$BUILD_DIR/$name_ver"
@@ -134,9 +137,6 @@ create() {
     local orig_tar="$BUILD_DIR/$orig_tar_name"
     local bp_args="$BUILDPACKAGE_ARGS"
     echo "$BUILDPACKAGE_ARGS" | grep -qE '\-sa|\-sd|\-si' || local sa="-sa"
-    
-    "$RM" -rf "$BUILD_DIR"
-    mkdir -p "$BUILD_DIR"
     
     # Create orig source tarball
     if [ -z "$DOWNLOAD_ORIG" ]
