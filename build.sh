@@ -405,7 +405,7 @@ _git_update() {
     then
         git clone --no-checkout -b "$branch" "$src_url" "$src_dir"
     else
-    	git --git-dir="$src_dir/.git" remote add "$remote" "$src_url" 2> /dev/null || true
+        git --git-dir="$src_dir/.git" remote add "$remote" "$src_url" 2> /dev/null || true
         git --git-dir="$src_dir/.git" fetch "$remote" "$branch:refs/remotes/$remote/$branch" -f
     fi
 }
@@ -633,7 +633,7 @@ _gen_pbuilderrc() {
     
     if [ -f "$DIR/.pbuilderrc" ]
     then
-    	sed "s/#DISTRIB#/$distrib/g; s;#DEB_MIRROR#;$DEB_MIRROR;g; \
+        sed "s/#DISTRIB#/$distrib/g; s;#DEB_MIRROR#;$DEB_MIRROR;g; \
              s;#PPA_DEPENDS#;$ppa_depends;g" < "$DIR/.pbuilderrc" > "$pbuilderrc"
     else
 cat << EOF > "$pbuilderrc"
@@ -685,9 +685,16 @@ _pbuilder_build() {
     local distrib=$1
     local arch=$2
     
+    local pkgs=""
     local btgz="$BASETGZ_DIR/${distrib}_${arch}.tgz"
-    local pkgs=$(for i in $PACKAGES; do case $i in *~$distrib.dsc) echo $i;; esac; done)
     local pbuilderrc="$BUILD_DIR/$distrib.pbuilderrc"
+    
+    for i in $PACKAGES
+    do 
+        case $i in
+            *~$distrib.dsc) pkgs="$pkgs $i";;
+        esac
+    done
 
     echo "Building packages: $pkgs"
     [ -d "$BUILD_DIR" ] || mkdir -p "$BUILD_DIR"
@@ -702,7 +709,7 @@ _pbuilder_build() {
 }
 
 _pbuilder_login() {
-	local distrib=$1
+    local distrib=$1
     local arch=$2
     local bind=''
     local btgz="$BASETGZ_DIR/${distrib}_${arch}.tgz"
