@@ -105,6 +105,11 @@ deb-src $PPA_URL/$PPA/ubuntu #DISTRIB# main"}
 # Target platforms
 : ${TARGET_PLATFORMS:="$(lsb_release -cs):$(dpkg-architecture -qDEB_BUILD_ARCH)"}
 
+# Sed pattern matching unsupported platforms
+: ${UNSUPPORTED_PLATFORMS:=""}
+[ -z "$UNSUPPORTED_PLATFORMS" ] || \
+TARGET_PLATFORMS="$(echo "$TARGET_PLATFORMS" | sed -r "s/$UNSUPPORTED_PLATFORMS//g")"
+
 # Maximum number of changelog records.
 : ${MAX_CHANGELOGS:='1000'}
 
