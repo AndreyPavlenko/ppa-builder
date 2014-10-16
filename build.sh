@@ -102,9 +102,6 @@ deb-src $PPA_URL/$PPA/ubuntu #DISTRIB# main"}
 # URL of ppa sources
 : ${PPA_SOURCES:="$PPA_URL/$PPA/ubuntu/dists/#DISTRIB#/main/source/Sources.gz"}
 
-# PPA version
-: ${PPAN:="ppa1"}
-
 # Target platforms
 : ${TARGET_PLATFORMS:="$(lsb_release -cs):$(dpkg-architecture -qDEB_BUILD_ARCH)"}
 
@@ -595,7 +592,7 @@ _gen_changelog() {
     local version="$1"
     local dist="$2"
     local epoch="${3:-"$PKG_EPOCH"}"
-    local qualifier="${4:-"-$PPAN~$dist"}"
+    local qualifier="${4:-"-$dist"}"
     local date="${5:-"$(date -R)"}"
     
     [ -z "$epoch" ] || version="$epoch:$version"
@@ -692,7 +689,7 @@ _pbuilder_build() {
     for i in $PACKAGES
     do 
         case $i in
-            *~$distrib.dsc) pkgs="$pkgs $i";;
+            *-$distrib.dsc) pkgs="$pkgs $i";;
         esac
     done
 
