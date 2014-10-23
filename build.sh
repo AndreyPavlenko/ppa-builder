@@ -179,7 +179,9 @@ create() {
         $RM -rf "$src/debian"
         cp -r "$deb_dir" "$src"
         _changelog "$dist" | _gen_changelog "$version" "$dist" > "$src/debian/changelog"
-        sed -i "s/#MAINTAINER#/$MAINTAINER/" "$src/debian/control"
+        
+        sed -i "s/^Maintainer:.*$/Maintainer: $MAINTAINER/; s/^Source:.*$/Source: $PKG_NAME/" \
+               "$src/debian/control"*
 
         cd "$src"
         dpkg-buildpackage -rfakeroot $BUILDPACKAGE_ARGS $sa -S
