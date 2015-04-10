@@ -84,6 +84,7 @@ BUILD_DATE=$(date +%d.%m.%y)
 
 # URL of a Debian mirror
 : ${DEB_MIRROR:='http://archive.ubuntu.com/ubuntu'}
+: ${PORTS_DEB_MIRROR:='http://ports.ubuntu.com/ubuntu-ports'}
 
 # dpkg-buildpackage args
 : ${BUILDPACKAGE_ARGS:="-uc -us"}
@@ -124,6 +125,8 @@ TARGET_PLATFORMS="$(echo "$TARGET_PLATFORMS" | sed -r "s/$UNSUPPORTED_PLATFORMS/
 : ${SKIP_UPDATE_BASE:="$SKIP"}
 : ${SKIP_BUILD:='false'}
 : ${SKIP_UPLOAD:='true'}
+
+trap "$SUDO $RM -rf \"$BUILD_DIR\"" EXIT HUP INT QUIT TERM
 ################################################################################
 
 ################################## Targets #####################################
@@ -138,7 +141,6 @@ create() {
     local orig_tar_name="$name_ver.orig.tar.bz2"
     local orig_tar="$BUILD_DIR/$orig_tar_name"
     local bp_args="$BUILDPACKAGE_ARGS"
-    echo "$BUILDPACKAGE_ARGS" | grep -qE '\-sa|\-sd|\-si' || local sa="-sa"
     
     # Create orig source tarball
     if [ -z "$DOWNLOAD_ORIG" ]
@@ -146,6 +148,7 @@ create() {
         _checkout "$src"
         _orig_tarball "$src" "$orig_tar"
     else
+    	echo "$BUILDPACKAGE_ARGS" | grep -qE '\-sa|\-sd|\-si' || local sa="-sa"
         local ppa_distribs="$(curl "$PPA_URL/$PPA/ubuntu/dists/" 2>/dev/null | awk -F '">|/<' '/\/icons\/folder.gif/ {print $4}')"
         local dir=''
         
@@ -169,7 +172,6 @@ create() {
         fi
     fi
     
-    
     # Create source packages
     for dist in $(for i in $TARGET_PLATFORMS; do echo $i | awk -F ':' '{print $1}'; done | sort -u)
     do
@@ -179,6 +181,7 @@ create() {
         $RM -rf "$src/debian"
         cp -r "$deb_dir" "$src"
         _changelog "$dist" | _gen_changelog "$version" "$dist" > "$src/debian/changelog"
+        _deb_dir_preprocess "$src/debian" "$dist"
         
         sed -i "s/^Maintainer:.*$/Maintainer: $MAINTAINER/; s/^Source:.*$/Source: $PKG_NAME/" \
                "$src/debian/control"*
@@ -630,24 +633,54 @@ _print_functions() {
     sort -u
 }
 
+_is_arm() {
+    local arch="$1"
+    
+    if [ "$arch" = "armhf" ] && [ "$(dpkg --print-architecture)" != "armhf" ]
+    then
+        return 0;
+    elif [ "$arch" = "armel" ] && [ "$(dpkg --print-architecture)" != "armel" ]
+    then
+        return 0;
+    else
+        return 1;
+    fi
+}
+
 _gen_pbuilderrc() {
     local distrib="$1"
-    local pbuilderrc="$2"
+    local arch="$2"
+    local pbuilderrc="$3"
     local ppa_depends="$(echo "$PPA_DEPENDS" | sed "s/#DISTRIB#/$distrib/g")"
+    
+    if _is_arm "$arch"
+    then
+        local deb_mirror="$PORTS_DEB_MIRROR"
+    else
+        local deb_mirror="$DEB_MIRROR"
+    fi
+    
+    if [ -z "$PPA_DEPENDS" ]
+    then
+        local ppa_depends=''
+    else	
+        local ppa_depends="|$(echo "$PPA_DEPENDS" | sed "s/#DISTRIB#/$distrib/g")"
+    fi
     
     if [ -f "$DIR/.pbuilderrc" ]
     then
-        sed "s/#DISTRIB#/$distrib/g; s;#DEB_MIRROR#;$DEB_MIRROR;g; \
+        sed "s/#DISTRIB#/$distrib/g; s;#DEB_MIRROR#;$deb_mirror;g; \
              s;#PPA_DEPENDS#;$ppa_depends;g" < "$DIR/.pbuilderrc" > "$pbuilderrc"
     else
 cat << EOF > "$pbuilderrc"
 ALLOWUNTRUSTED=yes
 APTCACHEHARDLINK=no
 BUILDRESULTUID=$SUDO_UID
+MIRRORSITE="$deb_mirror"
 OTHERMIRROR="\
-deb $DEB_MIRROR $distrib main restricted universe multiverse|\
-deb $DEB_MIRROR $distrib-security main restricted universe multiverse|\
-deb $DEB_MIRROR $distrib-updates main restricted universe multiverse|\
+deb $deb_mirror $distrib main restricted universe multiverse|\
+deb $deb_mirror $distrib-security main restricted universe multiverse|\
+deb $deb_mirror $distrib-updates main restricted universe multiverse\
 $ppa_depends"
 EOF
     fi
@@ -659,6 +692,13 @@ _pbuilder_create() {
     local btgz="$BASETGZ_DIR/${distrib}_${arch}.tgz"
     local pbuilderrc="$BUILD_DIR/$distrib.pbuilderrc"
     
+    if _is_arm "$arch"
+    then
+        local debootstrap="qemu-debootstrap"
+    else
+        local debootstrap="debootstrap"
+    fi
+    
     [ -d "$BUILD_DIR" ] || mkdir -p "$BUILD_DIR"
     [ -d "$BASETGZ_DIR" ] || mkdir -p "$BASETGZ_DIR"
     [ -d "$APT_CACHE_DIR" ] || mkdir -p "$APT_CACHE_DIR"
@@ -667,28 +707,33 @@ _pbuilder_create() {
     if [ ! -f "$btgz" ]
     then
         echo "Creating base tarball: $btgz"
-        _gen_pbuilderrc "$distrib" "$pbuilderrc"
-             $SUDO pbuilder create --configfile "$pbuilderrc" --debootstrapopts --variant=buildd --basetgz "$btgz"\
-                   --distribution ${distrib} --architecture ${arch} \
-                   $PBUILDER_ARGS || ($RM -f "$btgz" && return 1)
-        echo $SUDO pbuilder create --configfile "$pbuilderrc" --debootstrapopts --variant=buildd --basetgz "$btgz"\
-                   --distribution ${distrib} --architecture ${arch} \
-                   $PBUILDER_ARGS || ($RM -f "$btgz" && return 1)
+        _gen_pbuilderrc "$distrib" "$arch" "$pbuilderrc"
+        echo $SUDO pbuilder create --debootstrap "$debootstrap" \
+              --configfile "$pbuilderrc" \
+              --debootstrapopts --variant=buildd --basetgz "$btgz"\
+              --distribution ${distrib} --architecture ${arch} \
+              $PBUILDER_ARGS
+        $SUDO pbuilder create --debootstrap "$debootstrap" \
+              --configfile "$pbuilderrc" \
+              --debootstrapopts --variant=buildd --basetgz "$btgz"\
+              --distribution ${distrib} --architecture ${arch} \
+              $PBUILDER_ARGS || ($RM -f "$btgz" && return 1)
     elif [ "$SKIP_UPDATE_BASE" != "true" ]
     then
         echo "Updating base tarball: $btgz"
-        _gen_pbuilderrc "$distrib" "$pbuilderrc"
-        echo $SUDO pbuilder update --configfile "$pbuilderrc" --basetgz "$btgz" \
-                   --distribution ${distrib} --architecture ${arch} $PBUILDER_ARGS
-             $SUDO pbuilder update --configfile "$pbuilderrc" --basetgz "$btgz" \
-                   --distribution ${distrib} --architecture ${arch} $PBUILDER_ARGS
+        _gen_pbuilderrc "$distrib" "$arch" "$pbuilderrc"
+        echo $SUDO pbuilder update --debootstrap "$debootstrap" \
+              --configfile "$pbuilderrc" --basetgz "$btgz" \
+              --distribution ${distrib} --architecture ${arch} $PBUILDER_ARGS
+        $SUDO pbuilder update --debootstrap "$debootstrap" \
+              --configfile "$pbuilderrc" --basetgz "$btgz" \
+              --distribution ${distrib} --architecture ${arch} $PBUILDER_ARGS
     fi
 }
 
 _pbuilder_build() {
     local distrib=$1
     local arch=$2
-    
     local pkgs=""
     local btgz="$BASETGZ_DIR/${distrib}_${arch}.tgz"
     local pbuilderrc="$BUILD_DIR/$distrib.pbuilderrc"
@@ -704,12 +749,21 @@ _pbuilder_build() {
     [ -d "$BUILD_DIR" ] || mkdir -p "$BUILD_DIR"
     [ -d "$DISTRIBS_DEB_DIR" ] || mkdir -p "$DISTRIBS_DEB_DIR"
     [ -d "$APT_CACHE_DIR" ] || mkdir -p "$APT_CACHE_DIR"
+    
+    if _is_arm "$arch"
+    then
+        local debootstrap="qemu-debootstrap"
+    else
+        local debootstrap="debootstrap"
+    fi
 
-    _gen_pbuilderrc "$distrib" "$pbuilderrc"
-    echo $SUDO pbuilder build --configfile "$pbuilderrc" --basetgz "$btgz" \
-               --distribution ${distrib} --architecture ${arch} $PBUILDER_ARGS $pkgs
-         $SUDO pbuilder build --configfile "$pbuilderrc" --basetgz "$btgz" \
-               --distribution ${distrib} --architecture ${arch} $PBUILDER_ARGS $pkgs
+    _gen_pbuilderrc "$distrib" "$arch" "$pbuilderrc"
+    echo $SUDO pbuilder build --debootstrap "$debootstrap" \
+          --configfile "$pbuilderrc" --basetgz "$btgz" \
+          --distribution ${distrib} --architecture ${arch} $PBUILDER_ARGS $pkgs
+    $SUDO pbuilder build --debootstrap "$debootstrap" \
+          --configfile "$pbuilderrc" --basetgz "$btgz" \
+          --distribution ${distrib} --architecture ${arch} $PBUILDER_ARGS $pkgs
 }
 
 _pbuilder_login() {
@@ -725,7 +779,7 @@ _pbuilder_login() {
     [ -d "$DISTRIBS_DEB_DIR" ] || mkdir -p "$DISTRIBS_DEB_DIR"
     [ -d "$APT_CACHE_DIR" ] || mkdir -p "$APT_CACHE_DIR"
 
-    _gen_pbuilderrc "$distrib" "$pbuilderrc"
+    _gen_pbuilderrc "$distrib" "$arch" "$pbuilderrc"
     echo $SUDO pbuilder login --configfile "$pbuilderrc" --basetgz "$btgz" \
                --distribution ${distrib} --architecture ${arch} \
                $PBUILDER_ARGS --bindmounts "$bind"
@@ -747,5 +801,11 @@ _cur_version() {
 # checkout directory and distrib.
 _deb_dir() {
     echo "$DEB_DIR"
+}
+
+# Preprocess deb directory before creating a source package.
+_deb_dir_preprocess() {
+    # Do nothing by default
+    :
 }
 ################################################################################
