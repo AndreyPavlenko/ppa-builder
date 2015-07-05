@@ -141,6 +141,7 @@ create() {
     local orig_tar_name="$name_ver.orig.tar.bz2"
     local orig_tar="$BUILD_DIR/$orig_tar_name"
     local bp_args="$BUILDPACKAGE_ARGS"
+    echo "$BUILDPACKAGE_ARGS" | grep -qE '\-sa|\-sd|\-si' || local sa="-sa"
     
     # Create orig source tarball
     if [ -z "$DOWNLOAD_ORIG" ]
@@ -148,7 +149,6 @@ create() {
         _checkout "$src"
         _orig_tarball "$src" "$orig_tar"
     else
-    	echo "$BUILDPACKAGE_ARGS" | grep -qE '\-sa|\-sd|\-si' || local sa="-sa"
         local ppa_distribs="$(curl "$PPA_URL/$PPA/ubuntu/dists/" 2>/dev/null | awk -F '">|/<' '/\/icons\/folder.gif/ {print $4}')"
         local dir=''
         
