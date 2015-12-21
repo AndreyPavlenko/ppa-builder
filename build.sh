@@ -187,7 +187,7 @@ create() {
                "$src/debian/control"*
 
         cd "$src"
-        dpkg-buildpackage -rfakeroot $BUILDPACKAGE_ARGS $sa -S
+        dpkg-buildpackage -d -rfakeroot $BUILDPACKAGE_ARGS $sa -S
         [ -z "$sa" ] || sa='-sd'
     done
 
