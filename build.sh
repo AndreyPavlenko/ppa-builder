@@ -195,7 +195,7 @@ create() {
     [ -d "$DISTRIBS_SRC_DIR" ] || mkdir -p "$DISTRIBS_SRC_DIR"
     cd "$BUILD_DIR"
     PACKAGES=$(ls *.dsc)
-    mv *.tar.* *.dsc *.changes "$DISTRIBS_SRC_DIR"
+    mv *.tar.* *.dsc *.changes *.buildinfo "$DISTRIBS_SRC_DIR"
     $RM -rf "$BUILD_DIR"
 }
 
