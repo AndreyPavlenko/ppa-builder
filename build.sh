@@ -97,8 +97,8 @@ DEPENDS="pbuilder debootstrap lsb-release dpkg dpkg-dev debhelper $DEPENDS"
 
 # URL of a ppa containing build dependencies
 : ${PPA_DEPENDS:="\
-deb $PPA_URL/$PPA/ubuntu #DISTRIB# main|\
-deb-src $PPA_URL/$PPA/ubuntu #DISTRIB# main"}
+deb [allow-insecure=yes] $PPA_URL/$PPA/ubuntu #DISTRIB# main|\
+deb-src [allow-insecure=yes] $PPA_URL/$PPA/ubuntu #DISTRIB# main"}
 
 # URL of ppa sources
 : ${PPA_SOURCES:="$PPA_URL/$PPA/ubuntu/dists/#DISTRIB#/main/source/Sources.gz"}
